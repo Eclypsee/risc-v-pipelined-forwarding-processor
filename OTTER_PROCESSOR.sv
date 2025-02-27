@@ -17,6 +17,7 @@
 // Revision 0.01 - File Created
 // Additional Comments:
 // :(
+//CRAZY?
 
 
 
@@ -30,6 +31,7 @@
        	STORE	= 7'b0100011,
        	OP_IMM   = 7'b0010011,
        	OP   	= 7'b0110011,
+       	RESET_OP = 7'b0000000,
        	SYSTEM   = 7'b1110011
  } opcode_t;
    	 
@@ -101,7 +103,7 @@ PC PC(
 	.PC_RST(RST),
 	.PC_COUNT(pc)
 );
-wire [31:0]MEM_ADDR2, MEM_DIN2, MEM_IO, DOUT1, DOUT2;
+wire [31:0]MEM_ADDR2, MEM_DIN2, DOUT1, DOUT2;
 	
 OTTER_mem_byte Memory(
 	.MEM_CLK(CLK),
@@ -113,7 +115,7 @@ OTTER_mem_byte Memory(
 	.MEM_DIN2(MEM_DIN2),
 	.MEM_SIZE(SIZE),
 	.MEM_SIGN(SIGN),
-	.IO_IN(MEM_IO),
+	.IO_IN(IOBUS_IN),
 	.IO_WR(IOBUS_WR),
 	.MEM_DOUT1(DOUT1),
 	.MEM_DOUT2(DOUT2)
@@ -129,8 +131,9 @@ assign flush = (PC_SEL != 0) ? 1'b1: 1'b0;
 
 logic [31:0] decode_pc;
 	always_ff @(posedge CLK) begin
-			if(!lw_stall)
+			if(!lw_stall)begin
 				decode_pc <= pc;
+		end
 		flush_hold <= flush;
 			      	 
 end
@@ -158,26 +161,26 @@ logic [31:0] struct_ALU_src_A, struct_ALU_src_B;
 wire [1:0]srcA_SEL;
 wire [2:0]srcB_SEL;
 
-	assign if_de_inst.pc = decode_pc;
-	assign if_de_inst.ir = DOUT1;
-	assign if_de_inst.pcPLUS4 = decode_pc + 4;
-	assign if_de_inst.rs1_addr = DOUT1[19:15];
-	assign if_de_inst.rs2_addr = DOUT1[24:20];
-	assign if_de_inst.rd_addr = DOUT1[11:7];  
-	assign if_de_inst.mem_type = DOUT1[14:12];
-	assign if_de_inst.opcode = opcode_t'(DOUT1[6:0]);
-	assign if_de_inst.rs1_used=	if_de_inst.rs1_addr != 0
-								&& if_de_inst.opcode != LUI
-								&& if_de_inst.opcode != AUIPC
-								&& if_de_inst.opcode != JAL;
-	assign if_de_inst.rs2_used= if_de_inst.rs2_addr != 0
-								&& if_de_inst.opcode != LUI
-								&& if_de_inst.opcode != AUIPC
-								&& if_de_inst.opcode != JAL
-								&& if_de_inst.opcode != JALR
-								&& if_de_inst.opcode != LOAD
-								&& if_de_inst.opcode != OP_IMM
-								&& if_de_inst.opcode != STORE;
+	 assign if_de_inst.pc = decode_pc;
+	 assign if_de_inst.ir = DOUT1;
+	 assign if_de_inst.pcPLUS4 = decode_pc + 4;
+	 assign if_de_inst.rs1_addr = DOUT1[19:15];
+	 assign if_de_inst.rs2_addr = DOUT1[24:20];
+	 assign if_de_inst.rd_addr = DOUT1[11:7];  
+	 assign if_de_inst.mem_type = DOUT1[14:12];
+	 assign if_de_inst.opcode = opcode_t'(DOUT1[6:0]);
+	 assign if_de_inst.rs1_used=	if_de_inst.rs1_addr != 0
+	 							&& if_de_inst.opcode != LUI
+	 							&& if_de_inst.opcode != AUIPC
+	 							&& if_de_inst.opcode != JAL;
+	 assign if_de_inst.rs2_used= if_de_inst.rs2_addr != 0
+	 							&& if_de_inst.opcode != LUI
+	 							&& if_de_inst.opcode != AUIPC
+	 							&& if_de_inst.opcode != JAL
+	 							&& if_de_inst.opcode != JALR
+	 							&& if_de_inst.opcode != LOAD
+	 							&& if_de_inst.opcode != OP_IMM
+	 							&& if_de_inst.opcode != STORE;
 
 CU_DCDR Decoder (
 	.funct3(if_de_inst.ir[14:12]),
@@ -229,7 +232,7 @@ IMMED_GEN ImmGen(
 ALU_SRCA_MUX ALU_A_MUX(
 	.rs1(struct_rs1),
 	.Utype(U),
-	.NOT_rs1(!struct_rs1),
+	.NOT_rs1(~struct_rs1),
 	.srcA_SEL(srcA_SEL),
 	.ALU_srcA(struct_ALU_src_A)
 );
@@ -278,7 +281,8 @@ ALU_SRCB_MUX ALU_B_MUX
 			de_ex_inst.ir <= 32'b0;
 			de_ex_inst.rs1 <= 32'b0;
 			de_ex_inst.rs2 <= 32'b0;
-			de_ex_inst.opcode <= 7'b0;
+			de_ex_inst.opcode <= RESET_OP;
+			de_ex_inst <= '0;
 
 		end
 
@@ -401,7 +405,7 @@ DataHazardHandler DataHazardHandler(
 	.mem_wb_addr(mem_wb_inst.rd_addr),
 	.de_ex_addr(de_ex_inst.rd_addr),
 	.de_ex_opcode(de_ex_inst.opcode),
-	.ex_mem_opcode(ex_mem_inst.opcode),
+	//.ex_mem_opcode(ex_mem_inst.opcode),
 	.mem_wb_opcode(mem_wb_inst.opcode),
 	.ex_mem_RegWrite(ex_mem_inst.regWrite),
 	.mem_wb_RegWrite(mem_wb_inst.regWrite),
